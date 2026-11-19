@@ -1,0 +1,101 @@
+openapi: 3.0.3
+info:
+  title: Home Quote Experience API
+  version: 1.0.0
+  description: Experience API used by the channel to quote Home Essentials in Mexico, Colombia and Chile.
+servers:
+  - url: https://api.meridian.example/quote-xapi
+security:
+  - bearerAuth: []
+paths:
+  /v1/home/quotes:
+    post:
+      operationId: createHomeQuote
+      summary: Create a Home Essentials quote
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HomeQuoteRequest'
+      responses:
+        '201':
+          description: Quote created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeQuote'
+        default:
+          description: Error
+  /v1/home/quotes/{quoteId}:
+    get:
+      operationId: getHomeQuote
+      summary: Retrieve a Home Essentials quote
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The quote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeQuote'
+        default:
+          description: Error
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    HomeQuoteRequest:
+      type: object
+      required: [country, postalCode, squareMeters, includesContents]
+      properties:
+        country:
+          type: string
+          enum: [MX, CO, CL]
+        postalCode:
+          type: string
+        squareMeters:
+          type: integer
+          minimum: 1
+        includesContents:
+          type: boolean
+    HomeQuote:
+      type: object
+      required: [quoteId, country, product, premium, currency, ratingTableVersion, expiresAt]
+      properties:
+        quoteId:
+          type: string
+        country:
+          type: string
+          enum: [MX, CO, CL]
+        product:
+          type: string
+          example: HOME-ESSENTIALS
+        premium:
+          type: number
+          format: double
+        currency:
+          type: string
+        ratingTableVersion:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        coverages:
+          type: array
+          items:
+            type: string

@@ -1,0 +1,68 @@
+# Reusable pipeline template (Azure Pipelines) for BFFs and APIs of the Direct Digital Channel.
+# Not executed. Usage: extends this template from the service repository.
+parameters:
+  - name: serviceName
+    type: string
+  - name: countries
+    type: object
+    default: [MX, CO, CL]
+
+variables:
+  - group: ddc-common            # non-secret settings
+  - group: ddc-keyvault-secrets  # linked to Azure Key Vault
+
+stages:
+  - stage: Build
+    jobs:
+      - job: build_and_test
+        steps:
+          - script: ./mvnw -B verify
+            displayName: Build and unit tests
+          - task: PublishCodeCoverageResults@2
+            displayName: Coverage report (gate ≥ 80% on new code)
+          - script: echo "Pact consumer tests and publish contracts"
+            displayName: Contract tests
+
+  - stage: Scan
+    dependsOn: Build
+    jobs:
+      - job: security
+        steps:
+          - script: echo "SAST"
+            displayName: SAST (no new high or critical)
+          - script: echo "SCA"
+            displayName: Dependency scan (no critical)
+          - script: echo "Secret scanning"
+            displayName: Secret scanning
+          - script: echo "IaC scan"
+            displayName: IaC scan
+
+  - stage: DeployUAT
+    dependsOn: Scan
+    jobs:
+      - deployment: uat
+        environment: ddc-uat
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - ${{ each country in parameters.countries }}:
+                    - script: echo "Deploy ${{ parameters.serviceName }} to UAT ${{ country }}"
+                      displayName: Deploy UAT ${{ country }}
+                - script: echo "Verify provider contracts"
+                  displayName: Contract verification
+                - script: echo "Load test, p95 ≤ 2 s"
+                  displayName: Performance budget
+
+  - stage: DeployProd
+    dependsOn: DeployUAT
+    jobs:
+      - deployment: prod
+        environment: ddc-prod     # manual approval configured on the environment
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - ${{ each country in parameters.countries }}:
+                    - script: echo "Deploy ${{ parameters.serviceName }} to production ${{ country }}"
+                      displayName: Deploy production ${{ country }}
